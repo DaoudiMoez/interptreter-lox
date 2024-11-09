@@ -1,5 +1,17 @@
 import sys
 
+class Literal:
+    def __init__(self, value):
+        self.value = value
+    def __repr__(self):
+        if self.value is True:
+            return "true"
+        elif self.value is False:
+            return "false"
+        elif self.value is None:
+            return "nil"
+        return str(self.value)
+
 class Token:
     def __init__(self, type, lexeme, literal, line):
         self.type = type
@@ -9,6 +21,54 @@ class Token:
     def __str__(self):
         literal_str = "null" if self.literal is None else str(self.literal)
         return f"{self.type} {self.lexeme} {literal_str}"
+
+class Parser:
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.current = 0
+
+    def parse(self):
+        return self.expression()
+
+    def expression(self):
+        return self.primary()
+
+    def primary(self):
+        token = self.advance()
+
+        if token.type == "TRUE":
+            return Literal(True)
+        if token.type == "FALSE":
+            return Literal(False)
+        if token.type == "NIL":
+            return Literal(None)
+        if token.type == "NUMBER":
+            return Literal(token.literal) # Literal value of the NUMBER token
+        if token.type == "STRING":
+            return Literal(token.literal) # Literal value of the STRING token
+        if token.type == "LEFT_PAREN":
+            expr = self.expression()
+            if not self.match("RIGHT_PAREN"):
+                raise Exception("Expected ')' after expression.")
+            return f"(group {expr})" # The expected output
+        elif token.type == "IDENTIFIER":
+            return token.lexeme # Identifier name
+        else:
+            raise Exception(f"Unexpected token: {token.type}")
+    def match(self, expected_type):
+        if self.is_at_end() or self.tokens[self.current].type != expected_type:
+            return False
+        self.current += 1
+        return True
+    def advance(self):
+        if not self.is_at_end():
+            self.current += 1
+        return self.previous()
+    def previous(self):
+        return self.tokens[self.current - 1]
+    def is_at_end(self):
+        return self.current >= len(self.tokens) or self.tokens[self.current].type == "EOF"
+
 class Scanner:
     def __init__(self, source):
         self.source = source
@@ -186,17 +246,27 @@ def main():
         exit(1)
     command = sys.argv[1]
     filename = sys.argv[2]
-    if command != "tokenize":
+    if command not in ["tokenize", "parse"]:
         print(f"Unknown command: {command}", file=sys.stderr)
         exit(1)
     with open(filename) as file:
         file_contents = file.read()
-    scanner = Scanner(file_contents)
-    tokens, errors = scanner.scan_tokens()
-    for token in tokens:
-        print(token)
-    for error in errors:
-        print(error, file=sys.stderr)
+
+    if command == "tokenize":
+        scanner = Scanner(file_contents)
+        tokens, errors = scanner.scan_tokens()
+        for token in tokens:
+            print(token)
+        for error in errors:
+            print(error, file=sys.stderr)
+
+    elif command == "parse":
+        scanner = Scanner(file_contents)
+        tokens, errors = scanner.scan_tokens()
+        parser = Parser(tokens)
+        ast = parser.parse()
+        print(ast)
+
     if errors:
         exit(65)  # Exit with code 65 for lexical errors
 
